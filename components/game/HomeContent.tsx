@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 
-export default function AnimatedHomeContent() {
+export default function HomeContent() {
   return (
     <>
       <motion.div
@@ -36,4 +36,4 @@ export default function AnimatedHomeContent() {
       </motion.div>
     </>
   );
-}
+} 

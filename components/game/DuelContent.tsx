@@ -8,10 +8,10 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Crown, Users, User } from 'lucide-react';
 import { toast } from 'sonner';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Team, Card as GameCard, CardType } from '@/app/types/game';
+import { Team, Card as GameCard, CardType, CardState } from '@/app/types/game';
 import { CARD_IMAGES, INITIAL_POINTS, WIN_THRESHOLD, SLAVE_WIN_MULTIPLIER, SLAVE_LOSE_MULTIPLIER } from '@/app/constants/game';
 
-export default function AnimatedDuelContent() {
+export default function DuelContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const team = searchParams.get('team') as Team;
@@ -34,6 +34,8 @@ export default function AnimatedDuelContent() {
     const initialCardStates = savedCardStates ? JSON.parse(savedCardStates) : [];
     const initialPoints = savedPoints ? parseInt(savedPoints) : INITIAL_POINTS;
     
+    console.log('DuelContent - 初期ポイント:', initialPoints); // デバッグ用
+    
     setCardStates(initialCardStates);
     setPoints(initialPoints);
     
@@ -51,14 +53,14 @@ export default function AnimatedDuelContent() {
         type: index === 0 ? 'slave' : 'citizen'
       }));
       const randomIndex = Math.floor(Math.random() * slaveTeamCards.length);
-      cpuType = slaveTeamCards[randomIndex].type;
+      cpuType = slaveTeamCards[randomIndex].type as CardType;
     } else {
       // If player is slave, CPU is from king team
       const kingTeamCards = Array(5).fill(null).map((_, index) => ({
         type: index === 0 ? 'king' : 'citizen'
       }));
       const randomIndex = Math.floor(Math.random() * kingTeamCards.length);
-      cpuType = kingTeamCards[randomIndex].type;
+      cpuType = kingTeamCards[randomIndex].type as CardType;
     }
     
     setCpuCard({
@@ -72,10 +74,15 @@ export default function AnimatedDuelContent() {
       setShowCpuCard(true);
       const battleResult = determineWinner(selectedCardType, cpuType);
       const change = calculatePointChange(battleResult);
-      const newPoints = points + change;
+      const newPoints = initialPoints + change;
+      
       setPointChange(change);
       setPoints(newPoints);
+      
+      // 確実にセッションストレージに保存
       sessionStorage.setItem('points', newPoints.toString());
+      console.log('DuelContent - セッションストレージに保存したポイント:', sessionStorage.getItem('points')); // デバッグ用
+      
       setResult(battleResult);
       setTimeout(() => {
         setShowModal(true);
@@ -83,7 +90,7 @@ export default function AnimatedDuelContent() {
     }, 5000);
 
     return () => clearTimeout(timer);
-  }, [team]);
+  }, [team, betAmount]);
 
   const calculatePointChange = (result: 'win' | 'lose' | 'draw'): number => {
     if (result === 'draw') return 0;
@@ -95,6 +102,8 @@ export default function AnimatedDuelContent() {
       if (team === 'slave') change *= SLAVE_LOSE_MULTIPLIER;
       change *= -1;
     }
+    
+    console.log(`DuelContent - ポイント変更: ${change} (元の掛け金: ${betAmount})`);
     return change;
   };
 
@@ -109,12 +118,31 @@ export default function AnimatedDuelContent() {
   };
 
   const handleNextRound = () => {
-    const isGameOver = points <= 0 || points >= WIN_THRESHOLD || round >= 4;
-    if (isGameOver) {
+    // 王様または奴隷が選択された場合
+    const isSpecialCardSelected = playerCard?.type === 'king' || playerCard?.type === 'slave' || cpuCard?.type === 'king' || cpuCard?.type === 'slave';
+    const isPointsExhausted = points <= 0 || points >= 100000; // 持ち点が0以下または100,000以上の場合
+    const isRound5Completed = round >= 5;
+    
+    
+    if (isPointsExhausted) {
+      // 持ち点が0以下または100,000以上の場合のみゲーム終了
+      // 最終ポイントを確実に保存
+      sessionStorage.setItem('points', points.toString());
+      
+      // カード状態はリセットするが、ポイントは保持したままリザルト画面へ
       sessionStorage.removeItem('cardStates');
-      sessionStorage.removeItem('points');
       router.push('/game/result');
+    } else if (isSpecialCardSelected || isRound5Completed) {
+      // 特殊カードが選択された場合、またはラウンド5が終了した場合は、チーム選択画面へ
+      // ポイントは保持したままチーム選択画面へ
+      sessionStorage.removeItem('cardStates'); // カード状態はリセット
+      sessionStorage.removeItem('team'); // チーム情報もリセット
+      router.push('/game');
+    } else if (result === 'draw') {
+      // 引き分けの場合は直接Play画面へ
+      router.push(`/game/play?team=${team}&bet=${betAmount}&round=${round + 1}`);
     } else {
+      // 市民カード同士の対決で勝敗がついた場合は次のラウンドへ
       router.push(`/game/bet?team=${team}&round=${round + 1}`);
     }
   };
@@ -128,7 +156,7 @@ export default function AnimatedDuelContent() {
     >
       <div className="bg-black/50 p-4 rounded-lg border border-yellow-900">
         <h2 className="text-2xl font-bold text-center text-yellow-500">
-          持ち点: {points.toLocaleString()} ポイント
+          賭け金: {betAmount.toLocaleString()} ポイント
         </h2>
       </div>
 
@@ -137,7 +165,7 @@ export default function AnimatedDuelContent() {
           <motion.div
             initial={{ rotateY: 180 }}
             animate={{ rotateY: 0 }}
-            transition={{ duration: 1, type: "spring", stiffness: 100 }}
+            transition={{ duration: 0.5 }}
             className="relative w-64 h-96"
           >
             <Card className="w-full h-full p-4 bg-black/50 border-yellow-900">
@@ -158,7 +186,7 @@ export default function AnimatedDuelContent() {
             <motion.div
               initial={{ rotateY: 180 }}
               animate={{ rotateY: 0 }}
-              transition={{ duration: 1, type: "spring", stiffness: 100 }}
+              transition={{ duration: 0.5 }}
               className="relative w-64 h-96"
             >
               <Card className="w-full h-full p-4 bg-black/50 border-yellow-900">
@@ -220,7 +248,10 @@ export default function AnimatedDuelContent() {
               onClick={handleNextRound}
               className="w-48 h-12 text-lg bg-gradient-to-r from-yellow-600 to-yellow-500 hover:from-yellow-500 hover:to-yellow-400"
             >
-              {points <= 0 || points >= WIN_THRESHOLD || round >= 4 ? 'ゲーム終了' : '次のラウンド'}
+              {(() => {
+                const isPointsExhausted = points <= 0 || points >= 100000;
+                return isPointsExhausted ? 'ゲーム終了' : '次のラウンド';
+              })()}
             </Button>
           </motion.div>
         </DialogContent>

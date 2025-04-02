@@ -7,7 +7,7 @@ import { Crown, Users, User } from 'lucide-react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 
-export default function AnimatedRulesContent() {
+export default function RulesContent() {
   return (
     <>
       <motion.div
@@ -40,7 +40,6 @@ export default function AnimatedRulesContent() {
               </li>
             </ul>
           </Card>
-
           <Card className="bg-black/50 border-yellow-900 p-6">
             <h2 className="text-2xl font-bold text-yellow-500 mb-4">ポイントシステム</h2>
             <ul className="space-y-4 text-lg text-white">
@@ -67,9 +66,9 @@ export default function AnimatedRulesContent() {
               </li>
             </ul>
           </Card>
+
         </div>
       </ScrollArea>
-
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -87,4 +86,4 @@ export default function AnimatedRulesContent() {
       </motion.div>
     </>
   );
-}
+} 

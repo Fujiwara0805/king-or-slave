@@ -9,12 +9,12 @@ import { INITIAL_POINTS, CARD_IMAGES } from '@/app/constants/game';
 import { Card } from '@/components/ui/card';
 import { Team, Card as GameCard, CardType, CardState } from '@/app/types/game';
 
-export default function AnimatedBetContent() {
+export default function PlayContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const team = searchParams.get('team');
+  const betAmount = parseInt(searchParams.get('bet') || '100');
   const round = parseInt(searchParams.get('round') || '1');
-  const [betAmount, setBetAmount] = useState<number>(100);
   const [selectedCard, setSelectedCard] = useState<GameCard>();
   const [timeLeft, setTimeLeft] = useState(60);
   const [cardStates, setCardStates] = useState<CardState[]>([]);
@@ -37,42 +37,50 @@ export default function AnimatedBetContent() {
   const initializeCards = () => {
     let initialCardStates: CardState[] = [];
     const savedCardStates = sessionStorage.getItem('cardStates');
+    const savedTeam = sessionStorage.getItem('team') as Team;
+    
+    // チームの取得を確実にする
+    const currentTeam = team || savedTeam || 'king';
+    
+    console.log('PlayContent - 現在のチーム:', currentTeam); // デバッグ用
 
-    if (savedCardStates && round > 1) {
+    if (savedCardStates) {
+      // 既存のカード状態を使用
       initialCardStates = JSON.parse(savedCardStates);
+      console.log('PlayContent - 保存されたカード状態を使用:', initialCardStates); // デバッグ用
     } else {
-      initialCardStates = Array(5).fill(null).map((_, index) => ({
-        index,
-        type: index === 0 ? (team === 'king' ? 'king' : 'slave') : 'citizen',
-        used: false
-      }));
+      // 新しいゲームまたは新しいチーム選択後は、カードを5枚にリセット
+      initialCardStates = Array(5).fill(null).map((_, index) => {
+        // 最初のカードは特殊カード（王様または奴隷）、残りは市民カード
+        const cardType = index === 0 
+          ? (currentTeam === 'king' ? 'king' : 'slave') 
+          : 'citizen';
+        
+        return {
+          index,
+          type: cardType,
+          used: false
+        };
+      });
+      
+      console.log('PlayContent - 新しいカード状態を作成:', initialCardStates); // デバッグ用
       sessionStorage.setItem('cardStates', JSON.stringify(initialCardStates));
     }
 
     setCardStates(initialCardStates);
 
     const availableCards: GameCard[] = [];
-    if (team === 'king') {
-      initialCardStates
-        .filter(state => !state.used)
-        .forEach(state => {
-          availableCards.push({
-            id: state.index.toString(),
-            type: state.type,
-            image: CARD_IMAGES[state.type]
-          });
+    initialCardStates
+      .filter(state => !state.used)
+      .forEach(state => {
+        availableCards.push({
+          id: state.index.toString(),
+          type: state.type,
+          image: CARD_IMAGES[state.type]
         });
-    } else {
-      initialCardStates
-        .filter(state => !state.used)
-        .forEach(state => {
-          availableCards.push({
-            id: state.index.toString(),
-            type: state.type,
-            image: CARD_IMAGES[state.type]
-          });
-        });
-    }
+      });
+    
+    console.log('PlayContent - 利用可能なカード:', availableCards); // デバッグ用
     setCards(shuffleCards(availableCards));
   };
 
@@ -121,7 +129,7 @@ export default function AnimatedBetContent() {
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm text-gray-400">賭けポイント</p>
-            <p className="text-2xl font-bold text-yellow-500">{betAmount}</p>
+            <p className="text-2xl font-bold text-yellow-500">{betAmount.toLocaleString()}</p>
           </div>
           <div>
             <p className="text-sm text-gray-400">残り時間</p>
