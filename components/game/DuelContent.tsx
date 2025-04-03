@@ -65,45 +65,66 @@ export default function DuelContent() {
     let cpuType: ExtendedCardType;
     
     if (team === 'king') {
-      // If player is king, CPU is from slave team
+      // プレイヤーが王様チームの場合、CPUは奴隷チーム
       const slaveTeamCards: ExtendedCardType[] = ['slave', 'citizen1', 'citizen2', 'citizen3', 'citizen4'];
       
-      // 使用済みでないカードのみをフィルタリング
-      const availableCards = slaveTeamCards.filter(card => !usedCpuCards.includes(card));
-      
-      // 使用可能なカードがない場合は全てのカードを再度使用可能にする
-      if (availableCards.length === 0) {
-        cpuType = slaveTeamCards[Math.floor(Math.random() * slaveTeamCards.length)];
-        // 使用済みカードをリセット
-        usedCpuCards = [];
+      // ラウンド5では強制的に奴隷カードを選択
+      if (round >= 5) {
+        cpuType = 'slave';
       } else {
-        // 使用可能なカードからランダムに選択
-        const randomIndex = Math.floor(Math.random() * availableCards.length);
-        cpuType = availableCards[randomIndex];
+        // 使用済みでないカードのみをフィルタリング
+        const availableCards = slaveTeamCards.filter(card => !usedCpuCards.includes(card));
+        
+        // 使用可能なカードがない場合は全てのカードを再度使用可能にする
+        if (availableCards.length === 0) {
+          cpuType = slaveTeamCards[Math.floor(Math.random() * slaveTeamCards.length)];
+          // 使用済みカードをリセット
+          usedCpuCards = [];
+        } else {
+          // ラウンド4で奴隷カードがまだ使われていない場合は確率を上げる
+          if (round === 4 && !usedCpuCards.includes('slave') && Math.random() > 0.5) {
+            cpuType = 'slave';
+          } else {
+            // それ以外の場合はランダム選択
+            const randomIndex = Math.floor(Math.random() * availableCards.length);
+            cpuType = availableCards[randomIndex];
+          }
+        }
       }
-      
     } else {
-      // If player is slave, CPU is from king team
+      // プレイヤーが奴隷チームの場合、CPUは王様チーム
       const kingTeamCards: ExtendedCardType[] = ['king', 'citizen1', 'citizen2', 'citizen3', 'citizen4'];
       
-      // 使用済みでないカードのみをフィルタリング
-      const availableCards = kingTeamCards.filter(card => !usedCpuCards.includes(card));
-      
-      // 使用可能なカードがない場合は全てのカードを再度使用可能にする
-      if (availableCards.length === 0) {
-        cpuType = kingTeamCards[Math.floor(Math.random() * kingTeamCards.length)];
-        // 使用済みカードをリセット
-        usedCpuCards = [];
+      // ラウンド5では強制的に王様カードを選択
+      if (round >= 5) {
+        cpuType = 'king';
       } else {
-        // 使用可能なカードからランダムに選択
-        const randomIndex = Math.floor(Math.random() * availableCards.length);
-        cpuType = availableCards[randomIndex];
+        // 使用済みでないカードのみをフィルタリング
+        const availableCards = kingTeamCards.filter(card => !usedCpuCards.includes(card));
+        
+        // 使用可能なカードがない場合は全てのカードを再度使用可能にする
+        if (availableCards.length === 0) {
+          cpuType = kingTeamCards[Math.floor(Math.random() * kingTeamCards.length)];
+          // 使用済みカードをリセット
+          usedCpuCards = [];
+        } else {
+          // ラウンド4で王様カードがまだ使われていない場合は確率を上げる
+          if (round === 4 && !usedCpuCards.includes('king') && Math.random() > 0.5) {
+            cpuType = 'king';
+          } else {
+            // それ以外の場合はランダム選択
+            const randomIndex = Math.floor(Math.random() * availableCards.length);
+            cpuType = availableCards[randomIndex];
+          }
+        }
       }
     }
     
     // 使用したカードを記録
-    usedCpuCards.push(cpuType);
-    sessionStorage.setItem('usedCpuCards', JSON.stringify(usedCpuCards));
+    if (!usedCpuCards.includes(cpuType)) {
+      usedCpuCards.push(cpuType);
+      sessionStorage.setItem('usedCpuCards', JSON.stringify(usedCpuCards));
+    }
     
     // CPUカード用の変数名を変更
     const cpuDisplayType: CardType = cpuType.startsWith('citizen') ? 'citizen' : cpuType as CardType;
@@ -138,7 +159,7 @@ export default function DuelContent() {
     }, 5000);
 
     return () => clearTimeout(timer);
-  }, [team, betAmount]);
+  }, [team, betAmount, round]);
 
   const calculatePointChange = (result: 'win' | 'lose' | 'draw'): number => {
     if (result === 'draw') return 0;
@@ -262,7 +283,15 @@ export default function DuelContent() {
         )}
       </div>
 
-      <Dialog open={showModal} onOpenChange={setShowModal}>
+      <Dialog open={showModal} onOpenChange={(open) => {
+        // モーダルを閉じようとした場合、何もしない（閉じさせない）
+        // 次のラウンドボタンを押した場合のみ閉じる
+        if (open === false) {
+          // 何もしない（閉じさせない）
+          return;
+        }
+        setShowModal(open);
+      }}>
         <DialogContent className="bg-black/90 border-2 border-yellow-500 text-center p-4 md:p-8 sm:p-6 xs:p-4 max-w-md mx-auto w-[calc(100%-32px)] xs:w-[calc(100%-16px)] flex flex-col items-center justify-start">
           <DialogTitle asChild>
             <h2 className="text-4xl md:text-6xl sm:text-5xl xs:text-3xl font-bold mb-4 md:mb-6 sm:mb-4 xs:mb-3 tracking-wider mt-2">
