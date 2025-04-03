@@ -2,6 +2,7 @@ import './globals.css';
 import type { Metadata } from 'next';
 import { Inter, Roboto } from 'next/font/google';
 import { Toaster } from '@/components/ui/sonner';
+import BackgroundMusic from '@/components/audio/BackgroundMusic';
 
 const inter = Inter({ subsets: ['latin'] });
 const roboto = Roboto({ weight: '400', subsets: ['latin'] });
@@ -18,8 +19,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ja" className={inter.className}>
-      <body>{children}</body>
-      <Toaster />
+      <body>
+        {children}
+        <BackgroundMusic />
+        <Toaster />
+      </body>
     </html>
   );
 }
