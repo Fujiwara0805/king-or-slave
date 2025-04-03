@@ -63,27 +63,19 @@ export default function PlayContent() {
     
     // チームの取得を確実にする
     const currentTeam = team || savedTeam || 'king';
-    
-    console.log('PlayContent - 現在のチーム:', currentTeam); // デバッグ用
 
     if (savedCardStates) {
       // 既存のカード状態を使用
       initialCardStates = JSON.parse(savedCardStates);
-      console.log('PlayContent - 保存されたカード状態を使用:', initialCardStates); // デバッグ用
     } else {
       // 新しいゲームまたは新しいチーム選択後は、カードを5枚にリセット
-      initialCardStates = Array(5).fill(null).map((_, index) => {
-        // 最初のカードは特殊カード（王様または奴隷）、残りは市民カード
-        const cardType = index === 0 
-          ? (currentTeam === 'king' ? 'king' : 'slave') 
-          : 'citizen';
-        
-        return {
-          index,
-          type: cardType,
-          used: false
-        };
-      });
+      initialCardStates = [
+        { index: 0, type: currentTeam === 'king' ? 'king' : 'slave', used: false },
+        { index: 1, type: 'citizen' as CardType, used: false },
+        { index: 2, type: 'citizen' as CardType, used: false },
+        { index: 3, type: 'citizen' as CardType, used: false },
+        { index: 4, type: 'citizen' as CardType, used: false }
+      ];
     
       sessionStorage.setItem('cardStates', JSON.stringify(initialCardStates));
     }
@@ -94,10 +86,12 @@ export default function PlayContent() {
     initialCardStates
       .filter(state => !state.used)
       .forEach(state => {
+        // 表示用のタイプを設定（citizen1-4はすべてcitizenとして表示）
+        const displayType = state.type.startsWith('citizen') ? 'citizen' : state.type;
         availableCards.push({
           id: state.index.toString(),
-          type: state.type,
-          image: CARD_IMAGES[state.type]
+          type: displayType,
+          image: CARD_IMAGES[displayType]
         });
       });
     

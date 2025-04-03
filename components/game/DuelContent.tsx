@@ -11,6 +11,9 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Team, Card as GameCard, CardType, CardState } from '@/app/types/game';
 import { CARD_IMAGES, INITIAL_POINTS, WIN_THRESHOLD, SLAVE_WIN_MULTIPLIER, SLAVE_LOSE_MULTIPLIER } from '@/app/constants/game';
 
+// カードタイプを拡張
+type ExtendedCardType = 'king' | 'slave' | 'citizen1' | 'citizen2' | 'citizen3' | 'citizen4';
+
 export default function DuelContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -33,46 +36,70 @@ export default function DuelContent() {
     const savedPoints = sessionStorage.getItem('points');
     const initialCardStates = savedCardStates ? JSON.parse(savedCardStates) : [];
     const initialPoints = savedPoints ? parseInt(savedPoints) : INITIAL_POINTS;
-    
-    console.log('DuelContent - 初期ポイント:', initialPoints); // デバッグ用
-    
+  
     setCardStates(initialCardStates);
     setPoints(initialPoints);
     
     setPlayerCard({
       id: 'player',
       type: selectedCardType,
-      image: CARD_IMAGES[selectedCardType]
+      image: CARD_IMAGES[selectedCardType.startsWith('citizen') ? 'citizen' : selectedCardType]
     });
 
+    // CPU側の使用済みカード情報を取得
+    let usedCpuCards: ExtendedCardType[] = [];
+    const savedUsedCpuCards = sessionStorage.getItem('usedCpuCards');
+    if (savedUsedCpuCards) {
+      usedCpuCards = JSON.parse(savedUsedCpuCards);
+    }
+
     // CPU card selection based on player's team
-    let cpuType: CardType;
+    let cpuType: ExtendedCardType;
+    
     if (team === 'king') {
       // If player is king, CPU is from slave team
-      const slaveTeamCards = Array(5).fill(null).map((_, index) => ({
-        type: index === 0 ? 'slave' : 'citizen'
-      }));
-      const randomIndex = Math.floor(Math.random() * slaveTeamCards.length);
-      cpuType = slaveTeamCards[randomIndex].type as CardType;
+      const slaveTeamCards: ExtendedCardType[] = ['slave', 'citizen1', 'citizen2', 'citizen3', 'citizen4'];
+      
+      // 使用済みでないカードのみをフィルタリング
+      const availableCards = slaveTeamCards.filter(card => !usedCpuCards.includes(card));
+      
+      // 使用可能なカードからランダムに選択
+      const randomIndex = Math.floor(Math.random() * availableCards.length);
+      cpuType = availableCards[randomIndex];
+      
     } else {
       // If player is slave, CPU is from king team
-      const kingTeamCards = Array(5).fill(null).map((_, index) => ({
-        type: index === 0 ? 'king' : 'citizen'
-      }));
-      const randomIndex = Math.floor(Math.random() * kingTeamCards.length);
-      cpuType = kingTeamCards[randomIndex].type as CardType;
+      const kingTeamCards: ExtendedCardType[] = ['king', 'citizen1', 'citizen2', 'citizen3', 'citizen4'];
+      
+      // 使用済みでないカードのみをフィルタリング
+      const availableCards = kingTeamCards.filter(card => !usedCpuCards.includes(card));
+      
+      // 使用可能なカードからランダムに選択
+      const randomIndex = Math.floor(Math.random() * availableCards.length);
+      cpuType = availableCards[randomIndex];
     }
+    
+    // 使用したカードを記録
+    usedCpuCards.push(cpuType);
+    sessionStorage.setItem('usedCpuCards', JSON.stringify(usedCpuCards));
+    
+    // 表示用のカードタイプ（citizen1-4はすべてcitizenとして表示）
+    const displayType: CardType = cpuType.startsWith('citizen') ? 'citizen' : cpuType as CardType;
     
     setCpuCard({
       id: 'cpu',
-      type: cpuType,
-      image: CARD_IMAGES[cpuType]
+      type: displayType,
+      image: CARD_IMAGES[displayType]
     });
 
     // Show CPU card after 5 seconds
     const timer = setTimeout(() => {
       setShowCpuCard(true);
-      const battleResult = determineWinner(selectedCardType, cpuType);
+      // 勝敗判定用のカードタイプ（citizen1-4はすべてcitizenとして扱う）
+      const playerTypeForComparison: CardType = selectedCardType.startsWith('citizen') ? 'citizen' : selectedCardType as CardType;
+      const cpuTypeForComparison: CardType = displayType;
+      
+      const battleResult = determineWinner(playerTypeForComparison, cpuTypeForComparison);
       const change = calculatePointChange(battleResult);
       const newPoints = initialPoints + change;
       
@@ -81,7 +108,6 @@ export default function DuelContent() {
       
       // 確実にセッションストレージに保存
       sessionStorage.setItem('points', newPoints.toString());
-      console.log('DuelContent - セッションストレージに保存したポイント:', sessionStorage.getItem('points')); // デバッグ用
       
       setResult(battleResult);
       setTimeout(() => {
@@ -103,7 +129,6 @@ export default function DuelContent() {
       change *= -1;
     }
     
-    console.log(`DuelContent - ポイント変更: ${change} (元の掛け金: ${betAmount})`);
     return change;
   };
 
@@ -123,7 +148,6 @@ export default function DuelContent() {
     const isPointsExhausted = points <= 0 || points >= 100000; // 持ち点が0以下または100,000以上の場合
     const isRound5Completed = round >= 5;
     
-    
     if (isPointsExhausted) {
       // 持ち点が0以下または100,000以上の場合のみゲーム終了
       // 最終ポイントを確実に保存
@@ -131,12 +155,14 @@ export default function DuelContent() {
       
       // カード状態はリセットするが、ポイントは保持したままリザルト画面へ
       sessionStorage.removeItem('cardStates');
+      sessionStorage.removeItem('usedCpuCards'); // CPU側の使用済みカード情報もリセット
       router.push('/game/result');
     } else if (isSpecialCardSelected || isRound5Completed) {
       // 特殊カードが選択された場合、またはラウンド5が終了した場合は、チーム選択画面へ
       // ポイントは保持したままチーム選択画面へ
       sessionStorage.removeItem('cardStates'); // カード状態はリセット
       sessionStorage.removeItem('team'); // チーム情報もリセット
+      sessionStorage.removeItem('usedCpuCards'); // CPU側の使用済みカード情報もリセット
       router.push('/game');
     } else if (result === 'draw') {
       // 引き分けの場合は直接Play画面へ
@@ -152,62 +178,72 @@ export default function DuelContent() {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
-      className="space-y-8"
+      className="space-y-8 px-4 py-4 min-h-[100vh] flex flex-col"
     >
-      <div className="bg-black/50 p-4 rounded-lg border border-yellow-900">
-        <h2 className="text-2xl font-bold text-center text-yellow-500">
+      <div className="bg-gray-500/50 p-4 rounded-lg border border-yellow-900 sticky top-0 z-10 backdrop-blur-sm mt-4" >
+        <h2 className="text-2xl md:text-2xl sm:text-xl xs:text-lg font-bold text-center text-yellow-500">
           賭け金: {betAmount.toLocaleString()} ポイント
         </h2>
       </div>
 
-      <div className="flex justify-center gap-16 min-h-[500px] items-center">
+      <div className="flex justify-center items-center gap-4 md:gap-8 sm:gap-4 xs:gap-2 flex-grow ">
         <AnimatePresence>
           <motion.div
             initial={{ rotateY: 180 }}
             animate={{ rotateY: 0 }}
             transition={{ duration: 0.5 }}
-            className="relative w-64 h-96"
+            className="relative w-32 h-48 md:w-48 md:h-72 sm:w-36 sm:h-54 xs:w-28 xs:h-42"
           >
-            <Card className="w-full h-full p-4 bg-black/50 border-yellow-900">
+            <Card className="w-full h-full p-2 md:p-4 sm:p-3 xs:p-2 bg-black/50 border-yellow-900">
               <img
                 src={playerCard?.image}
                 alt="player card"
                 className="w-full h-full object-cover rounded"
               />
-              <div className="absolute bottom-0 left-0 w-full bg-black/50 p-2 text-center">
-                <p className="text-lg font-bold text-white">プレイヤー</p>
+              <div className="absolute bottom-0 left-0 w-full bg-black/50 p-1 md:p-2 sm:p-1 xs:p-1 text-center">
+                <p className="text-sm md:text-lg sm:text-base xs:text-xs font-bold text-white">プレイヤー</p>
               </div>
             </Card>
           </motion.div>
         </AnimatePresence>
 
-        {showCpuCard && (
+        <div className="text-center text-2xl md:text-3xl sm:text-2xl xs:text-xl font-bold text-yellow-500">VS</div>
+
+        {showCpuCard ? (
           <AnimatePresence>
             <motion.div
               initial={{ rotateY: 180 }}
               animate={{ rotateY: 0 }}
               transition={{ duration: 0.5 }}
-              className="relative w-64 h-96"
+              className="relative w-32 h-48 md:w-48 md:h-72 sm:w-36 sm:h-54 xs:w-28 xs:h-42"
             >
-              <Card className="w-full h-full p-4 bg-black/50 border-yellow-900">
+              <Card className="w-full h-full p-2 md:p-4 sm:p-3 xs:p-2 bg-black/50 border-yellow-900">
                 <img
                   src={cpuCard?.image}
                   alt="cpu card"
                   className="w-full h-full object-cover rounded"
                 />
-                <div className="absolute bottom-0 left-0 w-full bg-black/50 p-2 text-center">
-                  <p className="text-lg font-bold text-white">CPU</p>
+                <div className="absolute bottom-0 left-0 w-full bg-black/50 p-1 md:p-2 sm:p-1 xs:p-1 text-center">
+                  <p className="text-sm md:text-lg sm:text-base xs:text-xs font-bold text-white">CPU</p>
                 </div>
               </Card>
             </motion.div>
           </AnimatePresence>
+        ) : (
+          <div className="relative w-32 h-48 md:w-48 md:h-72 sm:w-36 sm:h-54 xs:w-28 xs:h-42">
+            <Card className="w-full h-full p-2 md:p-4 sm:p-3 xs:p-2 bg-black/50 border-yellow-900 flex items-center justify-center">
+              <div className="text-center text-lg md:text-2xl sm:text-xl xs:text-base font-bold text-yellow-500 animate-pulse">
+                ?
+              </div>
+            </Card>
+          </div>
         )}
       </div>
 
       <Dialog open={showModal} onOpenChange={setShowModal}>
-        <DialogContent className="bg-black/90 border-2 border-yellow-500 text-center p-8 max-w-md">
+        <DialogContent className="bg-black/90 border-2 border-yellow-500 text-center p-4 md:p-8 sm:p-6 xs:p-4 max-w-md mx-auto w-[calc(100%-32px)] xs:w-[calc(100%-16px)] flex flex-col items-center justify-start">
           <DialogTitle asChild>
-            <h2 className="text-6xl font-bold mb-8 tracking-wider">
+            <h2 className="text-4xl md:text-6xl sm:text-5xl xs:text-3xl font-bold mb-4 md:mb-6 sm:mb-4 xs:mb-3 tracking-wider mt-2">
             {result === 'win' ? '勝利' : result === 'lose' ? '敗北' : '引き分け'}
             </h2>
           </DialogTitle>
@@ -215,7 +251,7 @@ export default function DuelContent() {
             <motion.p
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
-              className={`text-2xl mb-4 ${pointChange > 0 ? 'text-green-500' : 'text-red-500'}`}
+              className={`text-xl md:text-2xl sm:text-xl xs:text-lg mb-2 md:mb-3 sm:mb-2 xs:mb-2 ${pointChange > 0 ? 'text-green-500' : 'text-red-500'}`}
             >
               {pointChange > 0 ? '+' : ''}{pointChange.toLocaleString()} ポイント
             </motion.p>
@@ -228,8 +264,9 @@ export default function DuelContent() {
               stiffness: 260,
               damping: 20
             }}
+            className="w-full flex flex-col items-center justify-center mt-0"
           >
-            <div className="text-8xl font-bold mb-8">
+            <div className="text-5xl md:text-8xl sm:text-6xl xs:text-4xl font-bold mb-4 md:mb-6 sm:mb-4 xs:mb-3">
               <motion.div
                 animate={{ scale: [1, 1.2, 1] }}
                 transition={{ duration: 0.5, repeat: Infinity, repeatDelay: 1 }}
@@ -246,7 +283,7 @@ export default function DuelContent() {
             </div>
             <Button
               onClick={handleNextRound}
-              className="w-48 h-12 text-lg bg-gradient-to-r from-yellow-600 to-yellow-500 hover:from-yellow-500 hover:to-yellow-400"
+              className="w-36 md:w-48 sm:w-40 xs:w-32 h-10 md:h-12 sm:h-11 xs:h-9 text-base md:text-lg sm:text-base xs:text-sm bg-gradient-to-r from-yellow-600 to-yellow-500 hover:from-yellow-500 hover:to-yellow-400 mb-4"
             >
               {(() => {
                 const isPointsExhausted = points <= 0 || points >= 100000;
