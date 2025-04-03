@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { Inter, Roboto } from 'next/font/google';
 import { Toaster } from '@/components/ui/sonner';
 import BackgroundMusic from '@/components/audio/BackgroundMusic';
+import AudioPermissionModal from '@/components/audio/AudioPermissionModal';
 
 const inter = Inter({ subsets: ['latin'] });
 const roboto = Roboto({ weight: '400', subsets: ['latin'] });
@@ -22,6 +23,7 @@ export default function RootLayout({
       <body>
         {children}
         <BackgroundMusic />
+        <AudioPermissionModal />
         <Toaster />
       </body>
     </html>
