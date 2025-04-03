@@ -1,5 +1,5 @@
 export type Team = 'king' | 'slave';
-export type CardType = 'king' | 'slave' | 'citizen';
+export type CardType = 'king' | 'slave' | 'citizen' | 'citizen1' | 'citizen2' | 'citizen3' | 'citizen4';
 
 export interface CardState {
   index: number;
@@ -12,6 +12,7 @@ export interface Card {
   type: CardType;
   image: string;
   selected?: boolean;
+  originalType?: string;
 }
 
 export interface GameState {

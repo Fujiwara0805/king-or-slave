@@ -1,9 +1,10 @@
 import './globals.css';
 import type { Metadata } from 'next';
-import { Playfair_Display } from 'next/font/google';
+import { Inter, Roboto } from 'next/font/google';
 import { Toaster } from '@/components/ui/sonner';
 
-const playfair = Playfair_Display({ subsets: ['latin'] });
+const inter = Inter({ subsets: ['latin'] });
+const roboto = Roboto({ weight: '400', subsets: ['latin'] });
 
 export const metadata: Metadata = {
   title: 'King or Slave - Strategic Card Game',
@@ -16,11 +17,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="ja">
-      <body className={`${playfair.className} bg-[#1a0f0f]`}>
-        {children}
-        <Toaster />
-      </body>
+    <html lang="ja" className={inter.className}>
+      <body>{children}</body>
+      <Toaster />
     </html>
   );
 }

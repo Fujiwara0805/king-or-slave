@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { INITIAL_POINTS } from '@/app/constants/game';
+import { toast } from 'sonner';
+import { Team } from '@/app/types/game';
 
 export default function BetContent() {
   const router = useRouter();
@@ -19,14 +21,35 @@ export default function BetContent() {
     // セッションストレージから現在のポイントを取得
     const savedPoints = sessionStorage.getItem('points');
     if (savedPoints) {
-      setCurrentPoints(parseInt(savedPoints));
+      const points = parseInt(savedPoints);
+      setCurrentPoints(points);
+      
+      // 奴隷チームの場合は最大賭け金を半分に制限
+      const savedTeam = sessionStorage.getItem('team') as Team;
+      const currentTeam = team || savedTeam;
+      
+      if (currentTeam === 'slave') {
+        const maxBet = Math.floor(points / 2);
+        // 現在の賭け金が最大値を超えていたら調整
+        if (betAmount > maxBet) {
+          setBetAmount(maxBet);
+        }
+      }
     }
-  }, []);
+  }, [team]);
 
   const handleBet = () => {
     const currentTeam = team || sessionStorage.getItem('team') as string;
     
     router.push(`/game/play?team=${currentTeam}&bet=${betAmount}&round=${round}`);
+  };
+
+  // スライダーの最大値を計算
+  const getMaxBet = () => {
+    const savedTeam = sessionStorage.getItem('team') as Team;
+    const currentTeam = team || savedTeam;
+    
+    return currentTeam === 'slave' ? Math.floor(currentPoints / 2) : currentPoints;
   };
 
   return (
@@ -64,7 +87,7 @@ export default function BetContent() {
               </label>
               <Slider
                 defaultValue={[100]}
-                max={currentPoints}
+                max={getMaxBet()}
                 min={100}
                 step={100}
                 className="w-full [&_[role=slider]]:bg-yellow-500 [&_[role=slider]]:border-yellow-600 [&_[role=track]]:bg-yellow-500 [&_[role=track].[data-state=inactive]]:bg-yellow-500/20"
@@ -72,6 +95,15 @@ export default function BetContent() {
                 value={[betAmount]}
               />
             </div>
+
+            {team === 'slave' && (
+              <div className="mt-2 p-2 bg-red-900/30 border border-red-800 rounded-md">
+                <p className="text-red-300 text-sm">
+                  ※奴隷チームは敗北時に賭けポイントの2倍が減少します。
+                  最大賭け金は現在のポイントの半分までです。
+                </p>
+              </div>
+            )}
 
             <Button
               onClick={handleBet}

@@ -31,19 +31,27 @@ export default function DuelContent() {
 
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search);
-    const selectedCardType = searchParams.get('selectedCard') as CardType;
+    const selectedCardParam = searchParams.get('selectedCard');
+    
+    // selectedCardがnullまたはundefinedの場合のデフォルト値を設定
+    const selectedCardType = selectedCardParam as CardType || 'citizen';
+    
+    // 表示用のタイプを設定（citizen1-4はすべてcitizenとして表示）
+    const displayType = selectedCardType.startsWith('citizen') ? 'citizen' : selectedCardType;
+    
     const savedCardStates = sessionStorage.getItem('cardStates');
     const savedPoints = sessionStorage.getItem('points');
     const initialCardStates = savedCardStates ? JSON.parse(savedCardStates) : [];
     const initialPoints = savedPoints ? parseInt(savedPoints) : INITIAL_POINTS;
-  
+
     setCardStates(initialCardStates);
     setPoints(initialPoints);
     
     setPlayerCard({
       id: 'player',
-      type: selectedCardType,
-      image: CARD_IMAGES[selectedCardType.startsWith('citizen') ? 'citizen' : selectedCardType]
+      type: displayType,
+      image: CARD_IMAGES[displayType as keyof typeof CARD_IMAGES],
+      originalType: selectedCardType  // 元のタイプを保存
     });
 
     // CPU側の使用済みカード情報を取得
@@ -63,9 +71,16 @@ export default function DuelContent() {
       // 使用済みでないカードのみをフィルタリング
       const availableCards = slaveTeamCards.filter(card => !usedCpuCards.includes(card));
       
-      // 使用可能なカードからランダムに選択
-      const randomIndex = Math.floor(Math.random() * availableCards.length);
-      cpuType = availableCards[randomIndex];
+      // 使用可能なカードがない場合は全てのカードを再度使用可能にする
+      if (availableCards.length === 0) {
+        cpuType = slaveTeamCards[Math.floor(Math.random() * slaveTeamCards.length)];
+        // 使用済みカードをリセット
+        usedCpuCards = [];
+      } else {
+        // 使用可能なカードからランダムに選択
+        const randomIndex = Math.floor(Math.random() * availableCards.length);
+        cpuType = availableCards[randomIndex];
+      }
       
     } else {
       // If player is slave, CPU is from king team
@@ -74,30 +89,37 @@ export default function DuelContent() {
       // 使用済みでないカードのみをフィルタリング
       const availableCards = kingTeamCards.filter(card => !usedCpuCards.includes(card));
       
-      // 使用可能なカードからランダムに選択
-      const randomIndex = Math.floor(Math.random() * availableCards.length);
-      cpuType = availableCards[randomIndex];
+      // 使用可能なカードがない場合は全てのカードを再度使用可能にする
+      if (availableCards.length === 0) {
+        cpuType = kingTeamCards[Math.floor(Math.random() * kingTeamCards.length)];
+        // 使用済みカードをリセット
+        usedCpuCards = [];
+      } else {
+        // 使用可能なカードからランダムに選択
+        const randomIndex = Math.floor(Math.random() * availableCards.length);
+        cpuType = availableCards[randomIndex];
+      }
     }
     
     // 使用したカードを記録
     usedCpuCards.push(cpuType);
     sessionStorage.setItem('usedCpuCards', JSON.stringify(usedCpuCards));
     
-    // 表示用のカードタイプ（citizen1-4はすべてcitizenとして表示）
-    const displayType: CardType = cpuType.startsWith('citizen') ? 'citizen' : cpuType as CardType;
+    // CPUカード用の変数名を変更
+    const cpuDisplayType: CardType = cpuType.startsWith('citizen') ? 'citizen' : cpuType as CardType;
     
     setCpuCard({
       id: 'cpu',
-      type: displayType,
-      image: CARD_IMAGES[displayType]
+      type: cpuDisplayType,
+      image: CARD_IMAGES[cpuDisplayType as keyof typeof CARD_IMAGES]
     });
 
     // Show CPU card after 5 seconds
     const timer = setTimeout(() => {
       setShowCpuCard(true);
       // 勝敗判定用のカードタイプ（citizen1-4はすべてcitizenとして扱う）
-      const playerTypeForComparison: CardType = selectedCardType.startsWith('citizen') ? 'citizen' : selectedCardType as CardType;
-      const cpuTypeForComparison: CardType = displayType;
+      const playerTypeForComparison: CardType = displayType;
+      const cpuTypeForComparison: CardType = cpuDisplayType;
       
       const battleResult = determineWinner(playerTypeForComparison, cpuTypeForComparison);
       const change = calculatePointChange(battleResult);

@@ -7,6 +7,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { INITIAL_POINTS, CARD_IMAGES } from '@/app/constants/game';
 import { Card } from '@/components/ui/card';
 import { Team, Card as GameCard, CardType, CardState } from '@/app/types/game';
+import { toast } from 'sonner';
 
 export default function PlayContent() {
   const router = useRouter();
@@ -69,12 +70,13 @@ export default function PlayContent() {
       initialCardStates = JSON.parse(savedCardStates);
     } else {
       // 新しいゲームまたは新しいチーム選択後は、カードを5枚にリセット
+      // 市民カードに具体的な番号を割り当てる
       initialCardStates = [
         { index: 0, type: currentTeam === 'king' ? 'king' : 'slave', used: false },
-        { index: 1, type: 'citizen' as CardType, used: false },
-        { index: 2, type: 'citizen' as CardType, used: false },
-        { index: 3, type: 'citizen' as CardType, used: false },
-        { index: 4, type: 'citizen' as CardType, used: false }
+        { index: 1, type: 'citizen1', used: false },
+        { index: 2, type: 'citizen2', used: false },
+        { index: 3, type: 'citizen3', used: false },
+        { index: 4, type: 'citizen4', used: false }
       ];
     
       sessionStorage.setItem('cardStates', JSON.stringify(initialCardStates));
@@ -84,14 +86,15 @@ export default function PlayContent() {
 
     const availableCards: GameCard[] = [];
     initialCardStates
-      .filter(state => !state.used)
+      .filter(state => !state.used)  // 使用済みでないカードのみをフィルタリング
       .forEach(state => {
         // 表示用のタイプを設定（citizen1-4はすべてcitizenとして表示）
         const displayType = state.type.startsWith('citizen') ? 'citizen' : state.type;
         availableCards.push({
           id: state.index.toString(),
           type: displayType,
-          image: CARD_IMAGES[displayType]
+          image: CARD_IMAGES[displayType as keyof typeof CARD_IMAGES],
+          originalType: state.type  // 元のタイプを保存
         });
       });
     
@@ -112,18 +115,27 @@ export default function PlayContent() {
     setSelectedCard(card);
   };
 
-  const handleBet = () => {
-    if (!selectedCard) return;
+  const handleConfirm = () => {
+    if (!selectedCard) {
+      toast.error('カードを選択してください');
+      return;
+    }
+
+    // 選択したカードを使用済みにマーク
+    const updatedCardStates = cardStates.map(state => {
+      if (state.index.toString() === selectedCard.id) {
+        return { ...state, used: true };
+      }
+      return state;
+    });
     
-    // Update card states
-    const updatedCardStates = cardStates.map(state => 
-      state.index.toString() === selectedCard.id 
-        ? { ...state, used: true }
-        : state
-    );
+    // 更新したカード状態を保存
     sessionStorage.setItem('cardStates', JSON.stringify(updatedCardStates));
     
-    router.push(`/game/duel?team=${team}&bet=${betAmount}&selectedCard=${selectedCard.type}&round=${round}`);
+    // 選択したカードの実際のタイプ（citizen1-4など）をURLパラメータとして渡す
+    const originalType = selectedCard.originalType || selectedCard.type;
+    
+    router.push(`/game/duel?team=${team}&bet=${betAmount}&round=${round}&selectedCard=${originalType}`);
   };
 
   // 残り時間に応じたテキストカラーを決定
@@ -202,7 +214,7 @@ export default function PlayContent() {
 
         <div className="flex justify-center mt-8 mb-4">
           <Button
-            onClick={handleBet}
+            onClick={handleConfirm}
             disabled={!selectedCard}
             className={`w-64 sm:w-full max-w-xs h-16 sm:h-14 xs:h-12 text-xl sm:text-lg xs:text-base transition-all ${
               selectedCard 
