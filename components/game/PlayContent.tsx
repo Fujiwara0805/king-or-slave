@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { Slider } from '@/components/ui/slider';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { INITIAL_POINTS, CARD_IMAGES } from '@/app/constants/game';
 import { Card } from '@/components/ui/card';
@@ -18,6 +17,7 @@ export default function PlayContent() {
   const [selectedCard, setSelectedCard] = useState<GameCard>();
   const [timeLeft, setTimeLeft] = useState(60);
   const [cardStates, setCardStates] = useState<CardState[]>([]);
+  const [cards, setCards] = useState<GameCard[]>([]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -29,6 +29,28 @@ export default function PlayContent() {
 
     return () => clearInterval(timer);
   }, []);
+
+  // 時間切れの場合、自動的に遷移
+  useEffect(() => {
+    if (timeLeft === 0) {
+      // ランダムにカードを選択して決闘画面へ
+      const randomIndex = Math.floor(Math.random() * cards.length);
+      const randomCard = cards[randomIndex];
+      
+      if (randomCard) {
+        // カード状態を更新
+        const updatedCardStates = cardStates.map(state => 
+          state.index.toString() === randomCard.id 
+            ? { ...state, used: true }
+            : state
+        );
+        sessionStorage.setItem('cardStates', JSON.stringify(updatedCardStates));
+        
+        // 決闘画面へ遷移
+        router.push(`/game/duel?team=${team}&bet=${betAmount}&selectedCard=${randomCard.type}&round=${round}`);
+      }
+    }
+  }, [timeLeft, cards, cardStates, team, betAmount, round, router]);
 
   useEffect(() => {
     initializeCards();
@@ -62,8 +84,7 @@ export default function PlayContent() {
           used: false
         };
       });
-      
-      console.log('PlayContent - 新しいカード状態を作成:', initialCardStates); // デバッグ用
+    
       sessionStorage.setItem('cardStates', JSON.stringify(initialCardStates));
     }
 
@@ -80,15 +101,12 @@ export default function PlayContent() {
         });
       });
     
-    console.log('PlayContent - 利用可能なカード:', availableCards); // デバッグ用
     setCards(shuffleCards(availableCards));
   };
 
   const shuffleCards = (cards: GameCard[]) => {
     return [...cards].sort(() => Math.random() - 0.5);
   };
-
-  const [cards, setCards] = useState<GameCard[]>([]);
 
   const selectCard = (card: GameCard) => {
     setCards(prev => 
@@ -114,65 +132,93 @@ export default function PlayContent() {
     router.push(`/game/duel?team=${team}&bet=${betAmount}&selectedCard=${selectedCard.type}&round=${round}`);
   };
 
+  // 残り時間に応じたテキストカラーを決定
+  const getTimeTextColor = () => {
+    if (timeLeft <= 5) return "text-red-600 animate-pulse";
+    if (timeLeft <= 10) return "text-red-500";
+    return "text-yellow-500";
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
-      className="space-y-8"
+      className="flex flex-col min-h-[100vh] py-0"
     >
-      <h1 className="text-4xl font-bold text-center text-yellow-500 mb-8">
-        {`ラウンド ${round} - カードを選択`}
-      </h1>
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="py-4 sticky top-0 z-10  backdrop-blur-sm"
+      >
+        <h1 className="text-4xl md:text-4xl sm:text-3xl xs:text-2xl font-bold text-center text-yellow-500 mb-2">
+          {`ROUND ${round}`}
+        </h1>
+      </motion.div>
 
-      <div className="bg-[#2E4F4F] bg-opacity-80 rounded-lg p-6 mb-8 border border-[#0E8388]">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm text-gray-400">賭けポイント</p>
-            <p className="text-2xl font-bold text-yellow-500">{betAmount.toLocaleString()}</p>
-          </div>
-          <div>
-            <p className="text-sm text-gray-400">残り時間</p>
-            <p className="text-2xl font-bold text-yellow-500">{timeLeft}秒</p>
-          </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-5 gap-6">
-        {cards.map((card) => (
-          <Card
-            key={card.id}
-            className={`p-4 cursor-pointer transition-all ${
-              card.selected ? 'border-yellow-500 scale-105' : 'border-gray-700 hover:border-gray-500'
-            } relative`}
-            onClick={() => selectCard(card)}
-          >
-            <div className="relative">
-              <img
-                src={card.image}
-                alt="card"
-                className="w-full h-52 object-cover rounded shadow-lg"
-              />
-              <div className="absolute bottom-0 left-0 w-full bg-black/50 p-2 text-center">
-                <p className="text-lg font-bold text-white">
-                  {card.type === 'king' && '王様'}
-                  {card.type === 'citizen' && '市民'}
-                  {card.type === 'slave' && '奴隷'}
-                </p>
+      <div className="flex-grow flex flex-col justify-between px-4 md:px-8 lg:px-12 py-4">
+        <div className="space-y-6 sm:space-y-4 xs:space-y-3">
+          <div className="bg-amber-900/40 border-amber-800 rounded-lg p-6 sm:p-4 xs:p-3 bg-[url('/paper-texture.png')] bg-blend-multiply">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-base sm:text-sm xs:text-xs text-amber-100">賭けポイント</p>
+                <p className="text-2xl sm:text-xl xs:text-lg font-bold text-yellow-500">{betAmount.toLocaleString()} px</p>
+              </div>
+              <div>
+                <p className="text-base sm:text-sm xs:text-xs text-amber-100">残り時間</p>
+                <p className={`text-2xl sm:text-xl xs:text-lg font-bold ${getTimeTextColor()}`}>{timeLeft}秒</p>
               </div>
             </div>
-          </Card>
-        ))}
-      </div>
+          </div>
 
-      <div className="flex justify-center mt-8">
-        <Button
-          onClick={handleBet}
-          disabled={!selectedCard}
-          className="w-64 h-16 text-xl bg-gradient-to-r from-yellow-600 to-yellow-500 hover:from-yellow-500 hover:to-yellow-400"
-        >
-          決闘開始
-        </Button>
+          <div className="text-center mb-2">
+            <p className="text-xl md:text-xl sm:text-lg xs:text-base font-bold text-amber-100">カードを選択してください</p>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-2 xs:grid-cols-2 gap-4 sm:gap-3 xs:gap-2 max-w-2xl mx-auto">
+            {cards.map((card) => (
+              <Card
+                key={card.id}
+                className={`p-3 sm:p-2 xs:p-1 cursor-pointer transition-all ${
+                  card.selected 
+                    ? 'border-4 border-yellow-500 scale-105 bg-yellow-700/30' 
+                    : 'border border-gray-700 hover:border-gray-500'
+                } relative`}
+                onClick={() => selectCard(card)}
+              >
+                <div className="relative">
+                  <img
+                    src={card.image}
+                    alt="card"
+                    className="w-full h-auto sm:h-auto xs:h-auto object-cover rounded shadow-lg"
+                  />
+                  <div className="absolute bottom-0 left-0 w-full bg-black/50 p-2 sm:p-1 xs:p-1 text-center">
+                    <p className="text-lg sm:text-base xs:text-sm font-bold text-white">
+                      {card.type === 'king' && '王様'}
+                      {card.type === 'citizen' && '市民'}
+                      {card.type === 'slave' && '奴隷'}
+                    </p>
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex justify-center mt-8 mb-4">
+          <Button
+            onClick={handleBet}
+            disabled={!selectedCard}
+            className={`w-64 sm:w-full max-w-xs h-16 sm:h-14 xs:h-12 text-xl sm:text-lg xs:text-base transition-all ${
+              selectedCard 
+                ? 'bg-gradient-to-r from-yellow-600 to-yellow-500 hover:from-yellow-500 hover:to-yellow-400 text-white border-2 border-yellow-300' 
+                : 'bg-gradient-to-r from-gray-600 to-gray-500 text-gray-300'
+            }`}
+          >
+            決闘開始
+          </Button>
+        </div>
       </div>
     </motion.div>
   );
